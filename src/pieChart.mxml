@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   width="760" height="340" initialize="application1_initializeHandler(event)">
+	<s:layout>
+		<s:BasicLayout verticalScrollPosition="0"/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.charts.HitData;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			//定义用于显示在饼图序列中的文本函数
+			private function pieChartLabelFunction(data:Object, field:String, index:Number, percentValue:Number):String 
+			{ 
+				return data.memberName;
+			}
+			
+			//定义饼图在鼠标经过时显示的数据提示函数
+			private function pieChartDataTipFunction(hitData:HitData):String
+			{										
+				//获取要绘制的图表项
+				var item:Object=hitData.item;
+				if(PieSeries(hitData.element).field == "memberO"){
+					return hitData.item.memberName+"支出："+item.memberO;
+				}
+				//返回图表在鼠标经过时显示的数据提示
+				return hitData.item.memberName+"收入："+item.memberI;
+			}			
+			
+			//初始化组件的同事将集合绑定到饼状图控件pieChart
+			protected function application1_initializeHandler(event:FlexEvent):void
+			{
+				hss.url="http://localhost:8080/pas/flex_getMemberMoney?a="+new Date().getTime();
+				hss.send();
+				hss.addEventListener(FaultEvent.FAULT,fault);
+				hss.addEventListener(ResultEvent.RESULT,suc);
+			}
+			
+			private function fault(event:FaultEvent):void{
+				Alert.show("fault:"+event.fault.message,"提示");
+			}
+			
+			private function suc(event:ResultEvent):void{
+				var result:String = event.result.toString();
+				var dataArr:Array = new Array();
+				var userJson:JSONDecoder = new JSONDecoder(result);
+				var d:Object = userJson.getValue().memberMoneyMap;
+				for each (var i:Object in d["memberResMap"])
+				{
+					var tempObj:Object = new Object();
+					tempObj["memberName"] = i["memberName"];
+					tempObj["memberO"] = Number(i["memberO"]);
+					tempObj["memberI"] = Number(i["memberI"]);
+					dataArr.push(tempObj);
+				}
+				piechart1.dataProvider=dataArr;
+				piechart2.dataProvider=dataArr;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<!--定义ArrayCollection实例，表示销售信息，做为数据源 
+		yearId表示销售年份、 salesVolume表示销售量、 salesRoom表示销售金额	
+		-->
+		<mx:WipeUp id="myWipUp" duration="1500"/>
+		<mx:HTTPService id="hss" method="POST" showBusyCursor="true">
+		</mx:HTTPService>
+	</fx:Declarations>
+	
+	<!-- 定义饼图
+	PieChart属性：
+	showDataTips：为true表示鼠标经过饼状图中的序列时显示提示、否则不显示
+	dataTipFunction：表示鼠标经过饼状图序列的时显示的飞越提示的【函数】该函数返回String表示提示信息
+	dataProvider：表示为饼状图绑定数据源
+	-->
+	<mx:PieChart id="piechart1" x="27" y="17" width="352" height="278"
+				 dataTipFunction="pieChartDataTipFunction" innerRadius=".3" showDataTips="true">
+		<!--定义饼图序列
+		series属性：
+		field：绑定数据源中的某个字段，并根据该字段呈现序列
+		labelFunction：用于指定序列上显示的文本的【回调函数】，该函数返回String，其值显示在序列上
+		labelPosition：指定如何呈现数据，none或insideWithCallout
+		-->
+		<mx:series>
+			<mx:PieSeries creationCompleteEffect="{myWipUp}" displayName="sss" field="memberO"
+						  labelFunction="pieChartLabelFunction" labelPosition="insideWithCallout"/>			
+		</mx:series>
+	</mx:PieChart>
+	
+	<mx:PieChart id="piechart2" x="367" y="17" width="352" height="278"
+				 dataTipFunction="pieChartDataTipFunction" innerRadius=".3" showDataTips="true">
+		<!--定义饼图序列
+		series属性：
+		field：绑定数据源中的某个字段，并根据该字段呈现序列
+		labelFunction：用于指定序列上显示的文本的【回调函数】，该函数返回String，其值显示在序列上
+		labelPosition：指定如何呈现数据，none或insideWithCallout
+		-->
+		<mx:series>
+			<mx:PieSeries creationCompleteEffect="{myWipUp}" field="memberI"
+						  labelFunction="pieChartLabelFunction" labelPosition="insideWithCallout"/>
+		</mx:series>
+	</mx:PieChart>
+	
+	<!--定义图例-->
+	<mx:Legend id="mylegend" x="250" y="300" dataProvider="{piechart1}" direction="horizontal"/>
+</s:Application>

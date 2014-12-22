@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				width="760" height="340" backgroundColor="white" initialize="init();"
+				layout="vertical" verticalAlign="middle" viewSourceURL="srcview/index.html">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.HitData;
+			import mx.charts.chartClasses.IAxis;
+			import mx.charts.chartClasses.Series;
+			import mx.charts.series.ColumnSeries;
+			import mx.charts.series.items.ColumnSeriesItem;
+			import mx.controls.Alert;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.StringUtil;
+			
+			private function linearAxis_labelFunc(item:Object, prevValue:Object, axis:IAxis):String {
+				return numberFormatter.format(item);
+			}
+			
+			private function columnChart_dataTipFunc(item:HitData):String {
+				var cSI:ColumnSeriesItem = item.chartItem as ColumnSeriesItem;
+				var col:String = ColumnSeries(item.element).yField;
+				return StringUtil.substitute("<b>{0}</b><br>{1}: {2}", cSI.item.name, col, numberFormatter.format(cSI.item[col]));
+			}
+			
+			private function columnSeries_labelFunc(chartItem:ChartItem, series:Series):String {
+				var col:String = ColumnSeries(chartItem.element).yField;
+				return numberFormatter.format(chartItem.item[col]);
+			}
+			
+			private function init():void{
+				hs.url = "http://localhost:8080/pas/flex_getFirstLevelIncome?a="+new Date().getTime();
+				hs.send();
+				hs.addEventListener(FaultEvent.FAULT,fault);
+				hs.addEventListener(ResultEvent.RESULT,suc);
+			}
+			
+			private function fault(event:FaultEvent):void{
+				Alert.show("fault:"+event.fault.message,"提示");
+			}
+			
+			private function suc(event:ResultEvent):void{
+				var result:String = event.result.toString();
+				var dataArr:Array = new Array();
+				var userJson:JSONDecoder = new JSONDecoder(result);
+				var d:Object = userJson.getValue().incomeMap;
+				for each (var i:Object in d["mapIncomeRes"])
+				{
+					var tempObj:Object = new Object();
+					tempObj["name"] = i["name"];
+					tempObj["合计"] = Number(i["money"]);
+					dataArr.push(tempObj);
+				}
+				columnChart.dataProvider = dataArr;
+			}
+			
+			public function fillColor(item:ChartItem, index:Number):IFill{
+				var curItem:ColumnSeriesItem = ColumnSeriesItem(item);
+				if (curItem.item.name=="职业收入")
+					return(new SolidColor(0xFA8072, 1));
+				else if(curItem.item.name=="其他收入")
+					return(new SolidColor(0x8E388E, 1));
+				return (new SolidColor(0xff6600, 1));
+			}
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:NumberFormatter id="numberFormatter" precision="-1"/>
+		<mx:WipeUp id="myWipUp" duration="1500"/>
+		
+		<mx:HTTPService id="hs" method="POST" showBusyCursor="true">
+		</mx:HTTPService>
+	</fx:Declarations>
+	
+	<mx:ColumnChart id="columnChart" width="100%" height="100%" columnWidthRatio="0.6"
+					dataTipFunction="columnChart_dataTipFunc" showDataTips="true" type="stacked">
+		
+		<mx:horizontalAxis>
+			<mx:CategoryAxis id="ca" categoryField="name"/>
+		</mx:horizontalAxis>
+		
+		<mx:verticalAxis>
+			<mx:LinearAxis labelFunction="linearAxis_labelFunc"/>
+		</mx:verticalAxis>
+		
+		<mx:horizontalAxisRenderers>
+			<mx:AxisRenderer axis="{ca}"/>
+		</mx:horizontalAxisRenderers>
+		
+		<mx:series>
+			<mx:ColumnSeries id="slgSeries" creationCompleteEffect="{myWipUp}" displayName="职业收入"
+							 fillFunction="fillColor" labelFunction="columnSeries_labelFunc"
+							 labelPosition="outside" xField="name" yField="合计"/>
+		</mx:series>
+		
+		<mx:seriesFilters>
+			<fx:Array/>
+		</mx:seriesFilters>
+		
+	</mx:ColumnChart>
+</mx:Application>

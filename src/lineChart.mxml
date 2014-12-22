@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   width="760" height="340" backgroundColor="white" initialize="init();">
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center" verticalAlign="top"/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSONDecoder;
+			
+			import mx.charts.CategoryAxis;
+			import mx.charts.HitData;
+			import mx.charts.series.ColumnSeries;
+			import mx.charts.series.LineSeries;
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			//定义柱形图或折线图在鼠标经过时显示的数据提示函数
+			private function chartDataTipFunction(hitData:HitData):String
+			{				
+				//获取鼠标经过时序列的yField值
+				var yField:String;
+				if (hitData.element is LineSeries)
+				{
+					//如果鼠标经过时序列的类型为LineSeries，即折线图序列
+					yField=LineSeries(hitData.element).yField;
+				}				
+				if (hitData.element is  ColumnSeries)
+				{
+					//如果鼠标经过时序列的类型为ColumnSeries，即柱形图序列
+					yField=ColumnSeries(hitData.element).yField;
+				}				
+				//如果鼠标经过的是用于标识销售量的序列
+				if (yField=="incomeM")
+				{
+					return "收入："+hitData.item.incomeM;
+				}
+				//否则返回销售额
+				return "支出："+ hitData.item.spendingM;
+			}
+			//定义用于显示在柱形图或折线图序列X轴上的文本函数
+			private function Axis_labelFunction(categoryValue:Object, previousCategoryValue:Object, axis:CategoryAxis, categoryItem:Object):String 
+			{
+				return categoryItem.month+"月";
+			}			
+			
+			private function init():void{
+				hs.url="http://localhost:8080/pas/flex_getMonthPay?a="+new Date().getTime();
+				hs.send();
+				hs.addEventListener(FaultEvent.FAULT,fault);
+				hs.addEventListener(ResultEvent.RESULT,suc);
+			}
+			
+			private function fault(event:FaultEvent):void{
+				Alert.show("fault:"+event.fault.message,"提示");
+			}
+			
+			private function suc(event:ResultEvent):void{
+				var result:String = event.result.toString();
+				var dataArr:Array = new Array();
+				var userJson:JSONDecoder = new JSONDecoder(result);
+				var d:Object = userJson.getValue().trendMap;
+				for each (var i:Object in d["trendRes"])
+				{
+					var tempObj:Object = new Object();
+					tempObj["month"] = i["month"];
+					tempObj["spendingM"] = Number(i["spendingM"]);
+					tempObj["incomeM"] = Number(i["incomeM"]);
+					dataArr.push(tempObj);
+				}
+				linechart1.dataProvider=dataArr;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<!--定义ArrayCollection实例，表示销售信息，做为数据源 
+		yearId表示销售年份、 salesVolume表示销售量、 salesRoom表示销售金额
+		-->
+		
+		<mx:WipeRight id="myWipeRight" duration="2000"/>
+		<mx:HTTPService id="hs" method="POST" showBusyCursor="true">
+		</mx:HTTPService>
+	</fx:Declarations>
+	
+	<mx:LineChart id="linechart1" x="65" y="40" width="100%" height="100%"
+				  dataTipFunction="chartDataTipFunction"
+				  showDataTips="true">			
+		<!--定义X轴-->
+		<mx:horizontalAxis>
+			<!--设置x轴上显示的字段【数据源】
+			categoryField：表示作为x轴数据源的字段
+			labelFunction：表示显示文本的回调函数名，该函数返回String用于呈现文本
+			-->
+			<mx:CategoryAxis categoryField="month" labelFunction="Axis_labelFunction"/>
+		</mx:horizontalAxis>
+		
+		<mx:series>
+			<!--定义折线图系列
+			LineSeries属性：
+			xField：其值为数据源中的某个字段,该字段作为折线图序列x轴呈现的数据字段
+			yField：其值为数据源中的某个字段,该字段作为折线图序列y轴呈现的数据字段
+			displayName:该属性会和图例Legend一起使用，其值作为图例的描述名
+			-->
+			<mx:LineSeries creationCompleteEffect="{myWipeRight}" displayName="收入" xField="month"
+						   yField="incomeM"/>
+			<mx:LineSeries creationCompleteEffect="{myWipeRight}" displayName="支出" xField="month"
+						   yField="spendingM"/>
+		</mx:series>
+	</mx:LineChart>
+	
+	<!--定义图例-->
+	<mx:Legend id="mylegend" dataProvider="{linechart1}" direction="horizontal"/>
+</s:Application>
